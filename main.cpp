@@ -169,16 +169,9 @@ struct Tape{
 		}
 	}
 	std::vector<std::vector<float>> gen_history(const TM &tm,int64_t maxT,int64_t width,int64_t height,int64_t xpos,int64_t ypos){
-		std::vector<std::vector<float>> res(height,std::vector<float>(width));
+		std::vector<std::vector<float>> res(height,std::vector<float>(width,0.f));
 		int64_t lm=-1,rm=1;
 		int64_t ch=maxT/(1+height);
-		{
-			for(int64_t i=1;i<=ch*height/4*ypos;++i){
-				if(step(tm))break;
-				lm=std::min(lm,pos);
-				rm=std::max(rm,pos);
-			}
-		}
 		{
 			Tape t=*this;
 			for(int64_t i=1;i<=(ch*height);++i){
@@ -187,45 +180,51 @@ struct Tape{
 				rm=std::max(rm,t.pos);
 			}
 		}
+		int64_t lm_=lm,rm_=rm;
+		{
+			for(int64_t i=1;i<=ch*height/4*ypos;++i){
+				if(step(tm))break;
+				lm_=std::min(lm_,pos);
+				rm_=std::max(rm_,pos);
+			}
+		}
 		int64_t cw2=ceil((5+std::max(-lm,rm))*1./(1+width/2));
-		int64_t cw=width/2/(5+(std::max(-lm,rm)));
-		if(!cw)cw=1;
-		cw=std::min<int64_t>(1,cw);
+		if(!cw2)cw2=1;
+		auto mp=[&](int64_t p)->int64_t{
+			return width/8*(4-xpos)+int64_t(floor(p*1./cw2));
+		};
+		std::vector<float> tmp(width,0.f);
+		for(int64_t i=lm_;i<=rm_;++i){
+			int64_t x=mp(i);
+			if(0<=x&&x<width)tmp.at(x)+=at(i)*(1.f/cw2);
+		}
 		for(int64_t y=0;y<height;++y){
-			std::vector<float> tmp(rm-lm+1);
-			for(int64_t i=lm;i<=rm;++i)tmp[i-lm]=at(i);
+			int64_t lm0=pos,rm0=pos;
 			for(int64_t T=0;T<ch;++T){
 				if(s==-1)goto o;
-				if(lm<=pos&&pos<=rm){
-					float d=(tm.trans[s][in].out-int64_t(in))*(1.f/ch);
-					tmp[pos-lm]+=d*(ch-T-0.5f);
+				int64_t p0=mp(pos);
+				if(0<=p0&&p0<width){
+					float d=(tm.trans[s][in].out-int64_t(in))*(1.f/ch/cw2);
+					tmp.at(p0)+=d*(ch-T-0.5f);
+					lm0=std::min(lm0,pos);
+					rm0=std::max(rm0,pos);
 				}
 				if(step(tm))goto o;
 			}
-			if(cw2>1){
-				for(int64_t i=lm;i<=rm;++i){
-					auto p0=width/8*(4-xpos)+int(floor(i*1./cw2));
-					if(0<=p0&&p0<width)res[y][p0]+=tmp[i-lm]*(1.f/cw2);
-				}
-			}else{
-				for(int64_t i=0;i<width;++i){
-					auto p0=i/cw-width/8*(4-xpos)/cw;
-					res[y][i]=(lm<=p0&&p0<=rm?tmp[p0-lm]:0.f);
-				}
+			for(int64_t i=0;i<width;++i){
+				res.at(y).at(i)=tmp.at(i);
+			}
+			int64_t lm1=std::max<int64_t>(0,mp(lm0));
+			int64_t rm1=std::min(width-1,mp(rm0));
+			while(mp(lm0-1)==lm1)--lm0;
+			while(mp(rm0+1)==rm1)++rm0;
+			for(int64_t x=lm1;x<=rm1;++x)tmp.at(x)=0;
+			for(int64_t i=lm0;i<=rm0;++i){
+				int64_t x=mp(i);
+				if(0<=x&&x<width)tmp.at(x)+=at(i)*(1.f/cw2);
 			}
 		}
 		o:;
-		/*
-		for(int64_t i=1;i<=maxT;++i){
-			if(step(tm))break;
-			int64_t y=(i+ch-1)/ch;
-			if(y<height){
-				for(int64_t i=0;i<width;++i){
-					auto p0=i/cw-width/2/cw;
-					res[y][i]+=at(p0)*(1.f/ch);
-				}
-			}
-		}*/
 		return res;
 	}
 };
@@ -335,6 +334,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				case 'k':
 				case 'K':{
 					ypos+=1;
+					repaint=1;
+					break;
+				}
+				case 'o':
+				case 'O':{
+					xpos=0;
+					ypos=0;
 					repaint=1;
 					break;
 				}

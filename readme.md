@@ -8,5 +8,5 @@ Usage:
 
 - A/D: prev/next Turing machine
 - W/S: scale
-- I/J/K/L: move
+- I/J/K/L/O: move (up/left/down/right/reset)
 - 01,2,..,9: write current Turing machine and the number to `log.txt`
