@@ -112,8 +112,6 @@ struct TuringMachine {
 			std::cerr << "\"" << strc << "\"\n";
 		}
 
-		std::cout << "BB(" << tm.N_STATE << ", " << tm.N_CHAR << ")" << std::endl;
-
         for (size_t i = 0; i < tm.N_STATE; i++) {
 			std::vector<Trans> transArr;
 
@@ -481,52 +479,59 @@ const int N=960;
 
 
 
-struct Canvas{
+struct Canvas {
 	HWND hwnd;
-	HDC hdc,mdc;
-	HBRUSH hbr,hbr0,hbr1,hbr2;
-	HBRUSH hbr_press,hbr_release;
+	HDC hdc, mdc;
+	HBRUSH hbr, hbr0, hbr1, hbr2;
+	HBRUSH hbr_press, hbr_release;
 	HFONT hfont;
 	HBITMAP hbmp;
-	void init(){
-		mdc=CreateCompatibleDC(0);
-		hbmp=CreateCompatibleBitmap(hdc,N,N);
+	void init() {
+		mdc = CreateCompatibleDC(0);
+		hbmp = CreateCompatibleBitmap(hdc,N,N);
 		SelectObject(mdc,hbmp);
-		hbr=CreateSolidBrush(RGB(0,0,0));
-		hbr0=CreateSolidBrush(RGB(0xee,0xee,0xee));
-		hbr1=CreateSolidBrush(RGB(0xaa,0,0));
-		hbr2=CreateSolidBrush(RGB(0,0,0xaa));
-		hbr_press=CreateSolidBrush(RGB(0x00,0xff,0xff));
-		hbr_release=CreateSolidBrush(RGB(0x00,0x00,0xff));
+		hbr = CreateSolidBrush(RGB(0,0,0));
+		hbr0 = CreateSolidBrush(RGB(0xee,0xee,0xee));
+		hbr1 = CreateSolidBrush(RGB(0xaa,0,0));
+		hbr2 = CreateSolidBrush(RGB(0,0,0xaa));
+		hbr_press = CreateSolidBrush(RGB(0x00,0xff,0xff));
+		hbr_release = CreateSolidBrush(RGB(0x00,0x00,0xff));
 		hfont = CreateFontA(20, 0, 0, 0, FW_NORMAL, false, false, false, DEFAULT_CHARSET, 0, 0, 0, 0, "Arial");
 		SelectObject(mdc,hfont);
 		//SetBkMode(mdc,TRANSPARENT);
 	}
-	void reset(bool fin){
-		RECT rc={0,0,N,N};
-		FillRect(mdc,&rc,fin?hbr0:hbr);
+	void reset(bool fin) {
+		RECT rc = {0, 0, N, N};
+		FillRect(mdc, &rc, fin ? hbr0 : hbr);
 	}
-	void drawPixel(int x,int y,COLORREF color){
-		SetPixel(mdc,x,y,color);
+	void drawPixel(int x, int y, COLORREF color) {
+		SetPixel(mdc, x, y, color);
 	}
-	void draw(char *a){
-		HBITMAP bmp = CreateBitmap(N,N,1,8*4,(void*)a);
-		SelectObject(mdc,bmp);
+	void draw(char *a) {
+		HBITMAP bmp = CreateBitmap(N, N, 1, 8*4, (void*)a);
+		SelectObject(mdc, bmp);
 		DeleteObject(hbmp);
-		hbmp=bmp;
+		hbmp = bmp;
 	}
 	void drawText(const std::string &str) {
-		RECT rc={16,16,N,16+32};
+		RECT rc = {16, 16, N, 16+32};
 		DrawTextA(mdc, str.data(), str.length(), &rc,DT_LEFT);
 	}
 
-	void show(){
+	void show() {
 		BitBlt(hdc, 0, 0, N, N, mdc, 0, 0, SRCCOPY);
 	}
-}canvas;
-bool repaint=1,rev_tm=0;
-int64_t dir=0,scale_dir=0,xscale_dir=0,yscale_dir=0,maxT=N<<10,xpos=0,ypos=0,xscale=1,yscale=1,mouse_y=0,window_sz=1;
-int save_type=-1;
+} canvas;
+
+bool repaint = 1, rev_tm = 0;
+
+int64_t dir = 0;
+int64_t scale_dir = 0, xscale_dir = 0, yscale_dir = 0;
+int64_t maxT = N<<10;
+int64_t xpos = 0, ypos = 0;
+int64_t xscale = 1, yscale = 1, mouse_y = 0, window_sz = 1;
+
+int save_type = -1;
 std::mutex mtx;
 enum MouseEvent{
 	PRESS,
@@ -534,22 +539,23 @@ enum MouseEvent{
 	DRAG,
 	MOVE
 };
-void on_mouse(int x,int y,MouseEvent e){
+
+void on_mouse(int x, int y, MouseEvent e) {
 	std::lock_guard _(mtx);
 
 	switch (e) {
-		case PRESS:{
-			if(window_sz==1){
-				mouse_y=y;
-				repaint=1;
-			}else{
+		case PRESS:
+			if(window_sz == 1) {
+				mouse_y = y;
+				repaint = 1;
+			} else {
 				int64_t N0 = N / window_sz;
                 int64_t N1 = N0 * window_sz;
 
 				if( x >= 0 && x < N1 && y >= 0 && y < N1){
-					int64_t ptr = cur_tm + (y / N0 * window_sz) + (x / N0);
+					size_t ptr = size_t(cur_tm + (y / N0 * window_sz) + (x / N0));
 
-					if (ptr >=0 && ptr < tmList.size()){
+					if (ptr >= 0 && ptr < tmList.size()) {
 						std::ofstream ofs("log.txt", std::ios::out|std::ios::app);
 						ofs << tmList.at(ptr) << '\n';
 						ofs.close();
@@ -559,7 +565,6 @@ void on_mouse(int x,int y,MouseEvent e){
 				}
 			}
 			break;
-		}
 		case RELEASE:{
 			break;
 		}
@@ -781,15 +786,17 @@ DWORD WINAPI update(LPVOID lpParam){
 					if(window_sz==1)info=info_;
 					for(size_t y=0;y<h.size();++y){
 						for(size_t x=0;x<h[y].size();++x){
-							int c0=floor(std::max(0.f,std::min(1.f,h[y][x][0]))*255);
-							int c1=floor(std::max(0.f,std::min(1.f,h[y][x][1]))*255);
-							int c2=floor(std::max(0.f,std::min(1.f,h[y][x][2]))*255);
-							int c3=255;
-							size_t y1=N0*i+y,x1=N0*j+x,offset=(y1*N+x1)*4;
-							a[offset+0]=c2;
-							a[offset+1]=c1;
-							a[offset+2]=c0;
-							a[offset+3]=c3;
+							int c0 = floor(std::max(0.0f,std::min(1.0f,h[y][x][0]))*255);
+							int c1 = floor(std::max(0.0f,std::min(1.0f,h[y][x][1]))*255);
+							int c2 = floor(std::max(0.0f,std::min(1.0f,h[y][x][2]))*255);
+							int c3 = 255;
+							size_t y1 = N0 * i + y;
+							size_t x1 = N0 * j + x;
+							size_t offset = (y1 * N + x1)*4;
+							a[offset+0] = c2;
+							a[offset+1] = c1;
+							a[offset+2] = c0;
+							a[offset+3] = c3;
 						}
 					}
 				}
